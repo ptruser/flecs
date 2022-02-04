@@ -1525,7 +1525,8 @@ static
 void term_iter_init(
     const ecs_world_t *world,
     ecs_term_t *term,
-    ecs_term_iter_t *iter)
+    ecs_term_iter_t *iter,
+    bool empty_tables)
 {    
     const ecs_term_id_t *subj = &term->subj;
 
@@ -1542,10 +1543,28 @@ void term_iter_init(
     }
 
     iter->index = 0;
+
+    ecs_id_record_t *idr;
     if (iter->self_index) {
-        iter->cur = iter->self_index;
+        idr = iter->cur = iter->self_index;
     } else {
-        iter->cur = iter->set_index;
+        idr = iter->cur = iter->set_index;
+    }
+
+    if (idr) {
+        if (empty_tables) {
+            if ((empty_tables = !flecs_table_cache_empty_iter(
+                &idr->cache, &iter->it))) 
+            {
+                iter->empty_tables = true;
+            }
+        }
+
+        if (!empty_tables) {
+            flecs_table_cache_iter(&idr->cache, &iter->it);
+        }
+    } else {
+        term_iter_init_no_data(iter);
     }
 }
 
@@ -1572,7 +1591,7 @@ ecs_iter_t ecs_term_iter(
         .next = ecs_term_next
     };
 
-    term_iter_init(world, term, &it.priv.iter.term);
+    term_iter_init(world, term, &it.priv.iter.term, false);
 
     return it;
 error:
@@ -1602,7 +1621,7 @@ ecs_iter_t ecs_term_chain_iter(
         .next = ecs_term_next
     };
 
-    term_iter_init(world, term, &it.priv.iter.term);
+    term_iter_init(world, term, &it.priv.iter.term, false);
 
     return it;
 error:
@@ -1618,30 +1637,16 @@ const ecs_table_record_t *next_table(
         return NULL;
     }
 
-    ecs_table_iter_t it;
-    
-    if (iter->empty_tables) {
-        if (flecs_idr_empty_iter(idr, &it)) {
-            it.cur = it.begin + iter->index;
-        }
-        if (it.cur >= it.end) {
+    const ecs_table_record_t *tr;
+    if (!(tr = flecs_table_cache_next(&iter->it, ecs_table_record_t))) {
+        if (iter->empty_tables) {
             iter->empty_tables = false;
-            iter->index = 0;
+            flecs_table_cache_iter(&idr->cache, &iter->it);
+            tr = flecs_table_cache_next(&iter->it, ecs_table_record_t);
         }
     }
 
-    if (!iter->empty_tables) {
-        if (flecs_idr_iter(idr, &it)) {
-            it.cur = it.begin + iter->index;
-        }
-        if (it.cur >= it.end) {
-            return NULL;
-        }
-    }
-
-    iter->index ++;
-
-    return it.cur;
+    return tr;
 }
 
 static
@@ -1915,10 +1920,9 @@ ecs_iter_t ecs_filter_iter(
             term_iter_init_wildcard(world, &iter->term_iter);
         } else {
             ecs_assert(pivot_term >= 0, ECS_INTERNAL_ERROR, NULL);
-            term_iter_init(world, &terms[pivot_term], &iter->term_iter);
+            term_iter_init(world, &terms[pivot_term], &iter->term_iter, 
+                filter->match_empty_tables);
         }
-
-        iter->term_iter.empty_tables = filter->match_empty_tables;
     } else {
         if (!filter->match_anything) {
             iter->kind = EcsIterEvalCondition;

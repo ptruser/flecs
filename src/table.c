@@ -625,6 +625,8 @@ void flecs_table_remove_actions(
     run_on_remove(world, table, &table->storage);
 }
 
+#include <stdio.h>
+
 /* Free table resources. */
 void flecs_table_free(
     ecs_world_t *world,

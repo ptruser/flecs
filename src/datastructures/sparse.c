@@ -542,7 +542,7 @@ void* _flecs_sparse_remove_get(
             return NULL;
         }
 
-        /* Reset memory to zero on remove */
+        /* Return ptr */
         return DATA(chunk->data, sparse->size, offset);
     } else {
         /* Element is not paired and thus not alive, nothing to be done */

@@ -102,6 +102,9 @@ void* _ecs_map_set(
 #define ecs_map_set(map, key, payload)\
     _ecs_map_set(map, sizeof(*payload), (ecs_map_key_t)key, payload);
 
+#define ecs_map_set_ptr(map, key, payload)\
+    _ecs_map_set(map, sizeof(payload), (ecs_map_key_t)key, &payload);
+
 /** Free map. */
 FLECS_API
 void ecs_map_free(

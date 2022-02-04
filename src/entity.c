@@ -446,11 +446,12 @@ void instantiate(
         return;
     }
 
-    ecs_table_iter_t it;
+    ecs_table_cache_iter_t it;
     if (flecs_table_iter(world, ecs_pair(EcsChildOf, base), &it) != NULL) {
-        for (; it.cur < it.end; ++ it.cur) {
+        const ecs_table_record_t *tr;
+        while ((tr = flecs_table_cache_next(&it, ecs_table_record_t))) {
             instantiate_children(
-                world, base, table, data, row, count, it.cur->table);
+                world, base, table, data, row, count, tr->table);
         }
     }
 }
@@ -2419,11 +2420,11 @@ void on_delete_object_action(
     ecs_id_t id,
     ecs_entity_t action)
 {
-    ecs_table_iter_t it;
+    ecs_table_cache_iter_t it;
     ecs_id_record_t *idr;
     if ((idr = flecs_table_iter(world, id, &it))) {
-        for (; it.cur < it.end; ++ it.cur) {
-            const ecs_table_record_t *tr = it.cur;
+        const ecs_table_record_t *tr;
+        while ((tr = flecs_table_cache_next(&it, ecs_table_record_t))) {
             ecs_table_t *table = tr->table;
             ecs_assert(ecs_table_count(table) != 0, ECS_INTERNAL_ERROR, NULL);
 
@@ -2461,7 +2462,7 @@ void on_delete_id_action(
     ecs_id_t id,
     ecs_entity_t action)
 {
-    ecs_table_iter_t it;
+    ecs_table_cache_iter_t it;
     ecs_id_record_t *idr = flecs_table_iter(world, id, &it);
     if (idr) {
         if (!action) {
@@ -2472,8 +2473,8 @@ void on_delete_id_action(
             throw_invalid_delete(world, id);
         }
 
-        for (; it.cur < it.end; ++ it.cur) {
-            const ecs_table_record_t *tr = it.cur;
+        const ecs_table_record_t *tr;
+        while ((tr = flecs_table_cache_next(&it, ecs_table_record_t))) {
             ecs_table_t *table = tr->table;
 
             if (!action || action == EcsRemove) {

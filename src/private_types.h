@@ -216,21 +216,26 @@ struct ecs_table_t {
     int32_t refcount;
 };
 
-/** Table cache */
-typedef struct ecs_table_cache_t {
-    ecs_map_t *index; /* <table_id, index> */
-    ecs_vector_t *tables;
-    ecs_vector_t *empty_tables;
-    ecs_size_t size;
-    ecs_poly_t *parent;
-    void(*free_payload)(ecs_poly_t*, void*);
-} ecs_table_cache_t;
-
 /** Must appear as first member in payload of table cache */
 typedef struct ecs_table_cache_hdr_t {
     ecs_table_t *table;
+    struct ecs_table_cache_hdr_t *prev, *next;
+    uint32_t storage_id;
     bool empty;
 } ecs_table_cache_hdr_t;
+
+/** Table cache */
+typedef struct ecs_table_cache_t {
+    ecs_map_t *index; /* <table_id, T*> */
+    ecs_sparse_t *storage; /* sparse<storage_id, T*> */
+    ecs_table_cache_hdr_t *tables;
+    ecs_table_cache_hdr_t *empty_tables;
+    ecs_size_t size;
+    int32_t table_count;
+    int32_t empty_table_count;
+    ecs_poly_t *parent;
+    void(*free_payload)(ecs_poly_t*, void*);
+} ecs_table_cache_t;
 
 /* Sparse query column */
 typedef struct flecs_sparse_column_t {
@@ -505,13 +510,6 @@ struct ecs_id_record_t {
     uint64_t id; /* Id to element in storage */
 };
 
-/* Convenience struct to iterate table array for id */
-typedef struct ecs_table_iter_t {
-    const ecs_table_record_t *begin;
-    const ecs_table_record_t *end;
-    const ecs_table_record_t *cur;
-} ecs_table_iter_t;
-
 typedef struct ecs_store_t {
     /* Entity lookup */
     ecs_sparse_t *entity_index; /* sparse<entity, ecs_record_t> */
@@ -581,12 +579,14 @@ struct ecs_world_t {
     ecs_store_t store;
 
 
-    /* --  Storages for API objects -- */
+    /* --  Allocators for objects with stable pointers -- */
 
     ecs_sparse_t *queries;         /* sparse<query_id, ecs_query_t> */
     ecs_sparse_t *triggers;        /* sparse<query_id, ecs_trigger_t> */
     ecs_sparse_t *observers;       /* sparse<query_id, ecs_observer_t> */
     ecs_sparse_t *id_records;      /* sparse<idr_id, ecs_id_record_t> */
+    ecs_sparse_t *table_records;   /* sparse<tr_id, ecs_table_record_t> */
+    ecs_sparse_t *query_tables;    /* sparse<tr_id, ecs_query_table_t> */
 
 
     /* --  Pending table event buffers -- */

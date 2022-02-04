@@ -1535,6 +1535,9 @@ void* _ecs_map_set(
 #define ecs_map_set(map, key, payload)\
     _ecs_map_set(map, sizeof(*payload), (ecs_map_key_t)key, payload);
 
+#define ecs_map_set_ptr(map, key, payload)\
+    _ecs_map_set(map, sizeof(payload), (ecs_map_key_t)key, &payload);
+
 /** Free map. */
 FLECS_API
 void ecs_map_free(
@@ -2823,6 +2826,11 @@ typedef struct ecs_worker_iter_t {
     int32_t count;
 } ecs_worker_iter_t;
 
+/* Convenience struct to iterate table array for id */
+typedef struct ecs_table_cache_iter_t {
+    struct ecs_table_cache_hdr_t *cur, *next;
+} ecs_table_cache_iter_t;
+
 /** Term-iterator specific data */
 typedef struct ecs_term_iter_t {
     ecs_term_t term;
@@ -2830,6 +2838,7 @@ typedef struct ecs_term_iter_t {
     ecs_id_record_t *set_index;
 
     ecs_id_record_t *cur;
+    ecs_table_cache_iter_t it;
     int32_t index;
     
     ecs_table_t *table;
@@ -10962,11 +10971,8 @@ ecs_entity_t ecs_module_init(
 
 /* -- Queries -- */
 
-#define ecs_query_table_count(query)\
-    ecs_vector_count(query->cache.tables)
-
-#define ecs_query_empty_table_count(query)\
-    ecs_vector_count(query->cache.empty_tables)
+#define ecs_query_table_count(query) query->cache.table_count
+#define ecs_query_empty_table_count(query) query->cache.empty_table_count
 
 /* -- Iterators -- */
 
@@ -21028,6 +21034,7 @@ inline void emplace(world_t *world, id_t entity, Args&&... args) {
 
 inline void world::init_builtin_components() {
     component<Component>("flecs::core::Component");
+    component<ComponentLifecycle>("flecs::core::ComponentLifecycle");
     component<Type>("flecs::core::Type");
     component<Identifier>("flecs::core::Identifier");
     component<Trigger>("flecs::core::Trigger");

@@ -266,7 +266,7 @@ typedef struct ecs_rule_op_t {
 /* With context. Shared with select. */
 typedef struct ecs_rule_with_ctx_t {
     ecs_id_record_t *idr;      /* Currently evaluated table set */
-    int32_t table_index;
+    ecs_table_cache_iter_t it;
 } ecs_rule_with_ctx_t;
 
 /* Subset context */
@@ -3140,16 +3140,12 @@ ecs_table_record_t find_next_table(
     ecs_rule_filter_t *filter,
     ecs_rule_with_ctx_t *op_ctx)
 {
-    ecs_id_record_t *idr = op_ctx->idr;
-    ecs_table_iter_t it;
-    flecs_idr_iter(idr, &it);
-    it.cur = it.begin + op_ctx->table_index;
-
+    ecs_table_cache_iter_t *it = &op_ctx->it;
     ecs_table_t *table = NULL;
     int32_t column = -1;
 
-    for (; it.cur < it.end && (column == -1); ++ it.cur) {
-        const ecs_table_record_t *tr = it.cur;
+    const ecs_table_record_t *tr;
+    while ((tr = flecs_table_cache_next(it, ecs_table_record_t)) && (column == -1)) {
         table = tr->table;
 
         /* Should only iterate non-empty tables */
@@ -3164,8 +3160,6 @@ ecs_table_record_t find_next_table(
     if (column == -1) {
         table = NULL;
     }
-
-    op_ctx->table_index = (int32_t)(it.cur - it.begin);
 
     return (ecs_table_record_t){.table = table, .column = column};
 }
@@ -3433,7 +3427,7 @@ bool eval_subset(
             return false;
         }
 
-        frame->with_ctx.table_index = 0;
+        flecs_table_cache_iter(&idr->cache, &frame->with_ctx.it);
         table_record = find_next_table(&filter, &frame->with_ctx);
         
         /* If first table set has no non-empty table, yield nothing */
@@ -3509,7 +3503,7 @@ bool eval_subset(
             if (idr) {
                 ecs_rule_subset_frame_t *new_frame = &op_ctx->stack[sp + 1];
                 new_frame->with_ctx.idr = idr;
-                new_frame->with_ctx.table_index = 0;
+                flecs_table_cache_iter(&idr->cache, &new_frame->with_ctx.it);
                 table_record = find_next_table(&filter, &new_frame->with_ctx);
 
                 /* If set contains non-empty table, push it to stack */
@@ -3620,7 +3614,7 @@ bool eval_select(
     /* If this is not a redo, start at the beginning */
     if (!redo) {
         if (!table) {
-            op_ctx->table_index = 0;
+            flecs_table_cache_iter(&idr->cache, &op_ctx->it);
 
             /* Return the first table_record in the table set. */
             table_record = find_next_table(&filter, op_ctx);
